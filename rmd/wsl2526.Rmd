@@ -1,0 +1,41 @@
+---
+title: "Forecasting the Women's Super League"
+output: html_document
+date: "2025-10-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## How we got here
+It all started when I was reading Ian Graham's book *How to Win the Premier League*. If you haven't already, I can highly recommend reading it (with the caveat that I might be smack bang in the middle of the Venn diagram for the target audience for this book being both a Liverpool fan and a nerd). Anyway, his book inspired me to look deeper into the methods he's used when he first arrived at Liverpool in **20XX**. His first task was to evaluate how good Liverpool were compared to other teams. Knowing this is key to doing more detailed analysis on players, especially those not playing in the Premier League. Naturally, this is where I started, and it has the added benefit of being (relatively) accessible.
+
+## Aren't Chelsea just going to win the WSL again?
+Yes. Well, probably. I didn't start with the WSL. I actually started with the Premier League where there is just much more data, but I didn't have a particular goal in mind. But I'm also an Arsenal Women fan, and even though we've only played 5 games, the draw with West Ham makes you start thinking any hope of a WSL title was slipping away already. Chelsea had a perfect start and we've draw 2, including against the team who finished **X**th last year. You can't afford to slip up against treble winners on a **xx** game unbeaten streak. But how much did that game actually affect our chances?
+
+## The Model
+Oh yeah, this is meant to be about how I forecasted the remainder of the Women's Super League. Like Ian Graham at Liverpool, I'm using the Dixon-Coles model. Others have gone into far greater detail, and with much more expertise than I ever could, but in short the model uses data on the outcomes of matches to assign strength values to each team. These strengths can be used to simulate the remainder of the season, which I do 20,000 times.
+
+To give a little more colour, I'm have shot level xG data for every WSL game over past few seasons. To turn that into team strengths. 
+
+<details>
+  <summary>Why is using xG better than using match outcomes?</summary>
+  Following **X**, I have converted this shot-data into forecast outcomes. Take for instance the opening game of the 25/26 WSL season, Chelsea vs Manchester City which finished 2-1 to Chelsea. Chelsea only had 8 shots to Manchester City's 17, but combined they each generated a total 1.5xG. What is another one of Manchester City's shots had gone in, or if Chelsea had missed one of their sitters? Football is a low scoring game, and so actual goals scored don't always correlate perfectly with a team's strength on a game by game basis. Using this underlying data shows that actually this game could very easily have gone Manchester City's way. Using xG data, we can capture this. We know the probability of any given shot going in (that's what xG is), so what if we simulated this game again, and again. On average, what would the result have been? 
+</details> 
+
+
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
