@@ -12,42 +12,12 @@ wsl_shots <- read_rds(file = "./data/wsl_shots_test.rds") %>%
   filter(!is.na(shots)) %>%
   filter(Season_End_Year < 2026)
 
+# removing results froms 25/26
 wsl_results <- read_rds(file = "./data/wsl_results.rds") %>%
   filter(Season_End_Year < 2026)
 
-# function to simulate no. of goals based on xg values for each shot
-simulate_shots <- function(xgs) {
-  tibble::tibble(goals = 0:length(xgs),
-                 prob  = poisbinom::dpoisbinom(0:length(xgs), xgs))
-}
-
-# function to take simulated no. of goals and convert to score prob
-simulate_game <- function(shot_xgs) {
-  home_xgs <- shot_xgs %>% mutate(xG = as.numeric(xG), Home_Away = as.character(Home_Away)) %>% dplyr::filter(Home_Away == "Home") %>% pull(xG)
-  away_xgs <- shot_xgs %>% mutate(xG = as.numeric(xG), Home_Away = as.character(Home_Away)) %>% dplyr::filter(Home_Away == "Away") %>% pull(xG)
-  
-  if(length(home_xgs) == 0){
-    home_probs <- tibble(
-      hgoals = 0,
-      hprob = 1
-    )
-  } else{
-    home_probs <- simulate_shots(home_xgs) %>% dplyr::rename_all(function(x) paste0("h", x))
-  }
-  
-  if(length(away_xgs) == 0){
-    away_probs <- tibble(
-      agoals = 0,
-      aprob = 1
-    )
-  } else{
-    away_probs <- simulate_shots(away_xgs) %>% dplyr::rename_all(function(x) paste0("a", x))
-  }
-  
-  tidyr::crossing(home_probs, away_probs) %>%
-    dplyr::mutate(prob = .data$hprob * .data$aprob)
-}
-
+#loading in functions to simulate games
+source("./functions/simulate_game.R")
 # takes score prob and merges with   
 simulated_games <-
   wsl_shots_test %>%
@@ -104,13 +74,8 @@ forecast <- tibble(
     a_lambda = def_h * off_a
   )
 
-forecast_goals <- function(lambda){
-  dist <- Poisson(lambda)
-  tibble(goals = 0:10,
-         prob = pdf(dist,seq(0,10,1))
-  )
-}
 
+source(".data/functions/forecast_goals.R")
 forecast_scores <- forecast %>%
   mutate(h_pred = map(h_lambda, forecast_goals),
          a_pred = map(a_lambda, forecast_goals)

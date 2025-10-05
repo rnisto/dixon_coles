@@ -13,38 +13,8 @@ wsl_shots <- read_rds(file = "./data/wsl_shots_test.rds") %>%
 
 wsl_results <- read_rds(file = "./data/wsl_results.rds")
 
-# function to simulate no. of goals based on xg values for each shot
-simulate_shots <- function(xgs) {
-  tibble::tibble(goals = 0:length(xgs),
-                 prob  = poisbinom::dpoisbinom(0:length(xgs), xgs))
-}
-
-# function to take simulated no. of goals and convert to score prob
-simulate_game <- function(shot_xgs) {
-  home_xgs <- shot_xgs %>% mutate(xG = as.numeric(xG), Home_Away = as.character(Home_Away)) %>% dplyr::filter(Home_Away == "Home") %>% pull(xG)
-  away_xgs <- shot_xgs %>% mutate(xG = as.numeric(xG), Home_Away = as.character(Home_Away)) %>% dplyr::filter(Home_Away == "Away") %>% pull(xG)
-  
-  if(length(home_xgs) == 0){
-    home_probs <- tibble(
-      hgoals = 0,
-      hprob = 1
-    )
-  } else{
-    home_probs <- simulate_shots(home_xgs) %>% dplyr::rename_all(function(x) paste0("h", x))
-  }
-  
-  if(length(away_xgs) == 0){
-    away_probs <- tibble(
-      agoals = 0,
-      aprob = 1
-    )
-  } else{
-    away_probs <- simulate_shots(away_xgs) %>% dplyr::rename_all(function(x) paste0("a", x))
-  }
-  
-  tidyr::crossing(home_probs, away_probs) %>%
-    dplyr::mutate(prob = .data$hprob * .data$aprob)
-}
+#loading in functions to simulate games
+source("./functions/simulate_game.R")
 
 # produces a table of score probabilities based on shot-level xG data  
 simulated_games <-
@@ -77,23 +47,7 @@ format_percent <- function(p) {
   ifelse(abs(p) < 0.005, "0%", paste0(rounded, "%")) 
 }
 
-# example plot of probabilities
-ggplot(data = slice(simulated_games,1:28), aes(x = hgoals, y = agoals)) +
-  geom_tile(aes(alpha = prob), fill = "#08519c") +
-  geom_label(aes(label = format_percent(prob),
-                 colour = prob < 0.01)) +
-  scale_alpha_continuous(range = c(0, 1)) +
-  scale_colour_manual(values = c("black", "gray50")) +
-  scale_x_continuous(breaks = 0:10, minor_breaks = NULL) +
-  scale_y_continuous(breaks = 0:10, minor_breaks = NULL) +
-  theme_minimal() +
-  theme(panel.grid.major = element_line(linetype = "dotted"),
-        legend.position = "none") +
-  labs(title = "Simulated scoreline probabilities",
-       subtitle = "Chelsea vs Manchester City",
-       x = "Home goals",
-       y = "Away goals")
-
+# fitting the model using the weights we created above
 fit_simulated <- regista::dixoncoles(
   hgoal = hgoals,
   agoal = agoals,
@@ -112,15 +66,7 @@ hfa <- regista::tidy.dixoncoles(fit_simulated) %>%
   filter(parameter == "hfa") %>%
   pull(value) + 1
 
-# fit_simulated <- regista::dixoncoles(
-#   hgoal = HomeGoals,
-#   agoal = AwayGoals,
-#   hteam = Home,
-#   ateam = Away,
-#   data = factor_teams(wsl_2025_results, c("Home", "Away"))
-# )
-
-
+# creating a table of fixtures and corresponding strengths for forcasting
 forecast <- tibble(
   home = estimates$team, 
   away = estimates$team
@@ -145,13 +91,7 @@ forecast <- tibble(
   select(!homeaway)
 
 
-forecast_goals <- function(lambda){
-  dist <- Poisson(lambda)
-  tibble(goals = 0:10,
-         prob = pdf(dist,seq(0,10,1))
-  )
-}
-
+source(".data/functions/forecast_goals.R")
 forecast_scores <- forecast %>%
   mutate(h_pred = map(h_lambda, forecast_goals),
          a_pred = map(a_lambda, forecast_goals)
