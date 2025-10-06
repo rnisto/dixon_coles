@@ -16,26 +16,40 @@ wsl_shots <- read_rds(file = "./data/wsl_shots_test.rds") %>%
 wsl_results <- read_rds(file = "./data/wsl_results.rds") %>%
   filter(Season_End_Year < 2026)
 
-#loading in functions to simulate games
-source("./functions/simulate_game.R")
-# takes score prob and merges with   
-simulated_games <-
-  wsl_shots_test %>%
-  mutate(simulated_probabilities = map(shots, simulate_game)) %>%
-  select(Home, Away, Date, simulated_probabilities) %>%
-  unnest(cols = c(simulated_probabilities)) %>%
-  filter(prob > 0.001)  # Keep the number of rows vaguely reasonable
+simulated_games <- readRDS("./data/wsl_simulated_games.rds") %>%
+  filter(Season_End_Year < 2026)
 
-xg_weight <- 0.7
+# creating a tibble to store model parameters. 
+parameters <- tibble(
+  name = character(),
+  value = numeric(),
+  description = character(),
+  notes = character()
+)
 
+parameters <- parameters %>% 
+  add_row(
+    name = "xg_weight",
+    value = 0.7,
+    description = "The weight given to xG compared to goals",
+    notes = "Taken from other's work"
+) %>%
+  add_row(
+    name = "k",
+    value = 0.003,
+    description = "The value used in exp() to down-weight games played in the past",
+    notes = "Taken from other's work"
+  )
+
+# adjusting the probabilities calculated above by the xg_weight at time weighting.
 wsl_xresults <- wsl_results %>%
   select(Home, Away, HomeGoals, AwayGoals, Date) %>%
-  mutate(prob_ = 1 - xg_weight) %>%
+  mutate(prob_ = 1 - filter(parameters, name == "xg_weight")$value) %>%
   right_join(simulated_games, by = c("Home", "Away", "HomeGoals" = "hgoals", "AwayGoals" = "agoals", "Date")) %>%
   mutate(prob_ = replace(prob_, is.na(prob_), 0),
-         prob = xg_weight*prob + prob_,
+         prob = filter(parameters, name == "xg_weight")$value*prob + prob_,
          time_diff = as.numeric(max(Date) - Date),
-         time_weight = regista::discount_exponential(time_diff, 0.003),
+         time_weight = regista::discount_exponential(time_diff, filter(parameters, name == "k")$value),
          weight = time_weight * prob
   ) %>%
   select(Home, Away, hgoals = HomeGoals, agoals = AwayGoals, Date, weight) %>%
@@ -55,9 +69,14 @@ estimates <- regista::tidy.dixoncoles(fit_simulated) %>%
   mutate(value = exp(value)) %>%
   pivot_wider(values_from = value, names_from = "parameter")
 
-hfa <- regista::tidy.dixoncoles(fit_simulated) %>%
-  filter(parameter == "hfa") %>%
-  pull(value) + 1
+parameters <- parameters %>% add_row(
+  name = "hfa",
+  value = regista::tidy.dixoncoles(fit_simulated) %>%
+    filter(parameter == "hfa") %>%
+    pull(value) + 1,
+  description = "The offensive advantage home teams gain. Estimated from the model",
+  notes = ""
+)
 
 forecast <- tibble(
   home = estimates$team,
@@ -70,12 +89,11 @@ forecast <- tibble(
   left_join(estimates, by = c("away" = "team")) %>%
   rename("off_a" = "off", "def_a" = "def") %>%
   mutate(
-    h_lambda = off_h * def_a * hfa,
+    h_lambda = off_h * def_a * filter(parameters,name == "hfa")$value,
     a_lambda = def_h * off_a
   )
 
-
-source(".data/functions/forecast_goals.R")
+source("./functions/forecast_goals.R")
 forecast_scores <- forecast %>%
   mutate(h_pred = map(h_lambda, forecast_goals),
          a_pred = map(a_lambda, forecast_goals)

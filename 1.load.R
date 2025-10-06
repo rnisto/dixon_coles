@@ -24,7 +24,8 @@ read.csv("https://raw.githubusercontent.com/JaseZiv/worldfootballR_data/master/r
 
 # starting in 2019 when we have xg data
 wsl_results <- fb_match_results(country = "ENG", gender = "F", season_end_year = seq(2019,2026), tier = c("1st")) %>%
-  filter(Date <= today(), !is.na(HomeGoals))
+  filter(Date <= today(), !is.na(HomeGoals)) %>%
+  mutate(MatchID = paste0(stringr::str_sub(Home,0,3),paste0(stringr::str_sub(Away,0,3),Season_End_Year)))
 
 saveRDS(wsl_results, file = "./data/wsl_results.rds")
 
